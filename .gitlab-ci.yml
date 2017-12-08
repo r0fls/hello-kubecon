@@ -1,0 +1,105 @@
+stages:
+  - build
+  - test
+  - docker
+  - helm
+
+variables:
+  ECR_REPO: raphael.deem/hello-kubecon
+  ECR_HOST: <REDACTED>
+  HELM_CHART_REPOSITORY: <REDACTED>
+  APP_PORT: 80
+
+.template: &docker_job
+  image: "docker:1.12"
+  tags:
+    - tm-prod cicd build
+
+.template: &test_job
+  image: "golang:1.9"
+  tags:
+    - tm-nonprod cicd test
+
+.template: &helm_job
+  image: "tmhub.io/kubernetes/helm:v2.3.1_cd"
+  variables:
+    KUBERNETES_NAMESPACE_OVERWRITE: prd354
+    KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: tiller
+  environment:
+    name: dev
+
+  script:
+
+
+# combine build/push
+docker:
+  stage: build
+  <<: *docker_job
+  script:
+    - docker build --pull -t $ECR_HOST/$ECR_REPO:$CI_BUILD_REF --build-arg APP_PORT=80 .
+    - docker push $ECR_HOST/$ECR_REPO:$CI_BUILD_REF
+
+test:
+  image: "golang"
+  stage: test
+  <<: *test_job
+  script:
+    - go test
+
+deploy-aws:
+  stage: helm
+  <<: *helm_job
+  tags:
+    - preprod1.us-east-1
+    - kubernetes
+  script:
+    - helm init -c
+    - helm repo add tm $HELM_CHART_REPOSITORY
+    - helm repo update
+    - helm upgrade --tiller-namespace=prd354 -i hello-kubecon tm/webservice -f values.yaml -f aws-values.yaml --namespace=prd354 --set image.tag=$CI_BUILD_REF --set httpPort=$APP_PORT --version=0.10.0
+  only:
+    - master
+
+destroy-aws:
+  stage: helm
+  <<: *helm_job
+  tags:
+    - preprod1.us-east-1
+    - kubernetes
+  script:
+    - helm init -c
+    - helm --tiller-namespace=prd354 --namespace=prd354 delete --purge hello-kubecon
+  only:
+    - master
+  when: manual
+  allow_failure: true
+
+deploy-onprem:
+  stage: helm
+  <<: *helm_job
+  tags:
+    - phx
+    - nonprod
+    - kubernetes
+  script:
+    - helm init -c
+    - helm repo add tm $HELM_CHART_REPOSITORY
+    - helm repo update
+    - helm upgrade --tiller-namespace=prd354 -i hello-kubecon tm/webservice -f values.yaml -f onprem-values.yaml --namespace=prd354 --set image.tag=$CI_BUILD_REF --set httpPort=$APP_PORT --version=0.10.0
+  only:
+    - master
+
+destroy-onprem:
+  stage: helm
+  <<: *helm_job
+  tags:
+    - ash
+    - nonprod
+    - kubernetes
+  script:
+    - helm init -c
+    - helm --tiller-namespace=prd354 --namespace=prd354 delete --purge hello-kubecon
+  only:
+    - master
+  when: manual
+  allow_failure: true

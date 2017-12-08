@@ -1,0 +1,4 @@
+platform: onprem
+ingress:
+  fqdn: ""
+environment: nonprod

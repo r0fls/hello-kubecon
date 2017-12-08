@@ -1,0 +1,14 @@
+resources:
+  limits:
+    cpu: 100m
+    memory: 2Gi
+  requests:
+    cpu: 100m
+    memory: 1Gi
+image:
+  repository: "raphael.deem/hello-kubecon"
+ingress:
+  listenPorts:
+    http:
+      - 80
+productCode: prd354

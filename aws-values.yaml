@@ -1,0 +1,4 @@
+platform: aws
+ingress:
+  fqdn: ""
+environment: preprod
