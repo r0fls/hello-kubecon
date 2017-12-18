@@ -28,9 +28,6 @@ variables:
   environment:
     name: dev
 
-  script:
-
-
 # combine build/push
 docker:
   stage: build
